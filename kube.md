@@ -114,6 +114,7 @@ gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
 ```
 
 # Instancias de computo
+Kubernetes controllers
 ```bash
 for i in 0 1 2; do
   gcloud compute instances create controller-${i} \
