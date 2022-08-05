@@ -63,3 +63,12 @@ sudo mv cfssl cfssljson /usr/local/bin/
 ```bash
 wget https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl
 ```
+
+```bash
+sudo chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+```
+
+validar versión de cliente
+```bash
+kubectl version --client
+```
