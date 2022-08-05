@@ -72,3 +72,43 @@ validar versión de cliente
 ```bash
 kubectl version --client
 ```
+
+# Crear red virtual privada
+
+```bash
+gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+```
+marca error 'billing_not_enable', hay que activar la cuenta y añadir la cuenta de facturación.
+```bash
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+```
+Reglas de firewall
+```bash
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
+  --allow tcp,udp,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 10.240.0.0/24,10.200.0.0/16
+```
+
+Reglas de firewall para acceso externo con ssh, icmp y https
+```bash
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
+  --allow tcp:22,tcp:6443,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 0.0.0.0/0
+```
+listar la reglas creadas para el firewall
+```bash
+gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+```
+Crear la ip publica
+```bash
+gcloud compute addresses create kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region)
+```
+Validar la creación de la red
+```bash
+gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
+```
