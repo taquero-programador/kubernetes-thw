@@ -1307,4 +1307,30 @@ listar rutas del VPC
 ```bash
 gcloud compute routes list --filter "network: kubernetes-the-hard-way"
 ```
+# Desplegar DNS cluster
 
+## add-on dns cluster
+```bash
+kubectl apply -f https://storage.googleapis.com/kubernetes-the-hard-way/coredns-1.8.yaml
+```
+listar los pods
+```bash
+kubectl get pods -l k8s-app=kube-dns -n kube-system
+```
+verificación: crear busybox
+```bash
+kubectl run busybox --image=busybox:1.28 --command -- sleep 3600
+```
+listar pods en busybox
+```bash
+kubectl get pods -l run=busybox
+```
+full name busybox pods
+```bash
+POD_NAME=$(kubectl get pods -l run=busybox -o jsonpath="{.items[0].metadata.name}")
+```
+ejecutar dns lookup kubernetes budybox
+```bash
+kubectl exec -ti $POD_NAME -- nslookup kubernetes
+```
+cont https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/docs/13-smoke-test.md
