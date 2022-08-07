@@ -612,4 +612,120 @@ for instance in controller-0 controller-1 controller-2; do
   gcloud compute scp encryption-config.yaml ${instance}:~/
 done
 ```
-# continue seven docs
+
+# Crear archivo y llave para encriptacion de datos
+generar llave de encriptación
+```bash
+ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
+```
+archivo de encriptación
+```bash
+cat > encryption-config.yaml <<EOF
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: ${ENCRYPTION_KEY}
+      - identity: {}
+EOF
+```
+copiar archivo de configuración a los controllers
+```bash
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp encryption-config.yaml ${instance}:~/
+done
+```
+
+# ETCD cluster
+ejecutar el siguiente comando en cada uno de los controllers
+```bash
+gcloud compute ssh controller-0
+```
+con eso se mueve a cada uno de los controllers
+para activar la sync multple es:
+```bash
+ctrl + b y shift + :
+```
+descargar e instalalar binarios etcd
+```bash
+wget -q --show-progress --https-only --timestamping \
+  "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"
+```
+extraer e instalar servidor etcd y la utilidad de comando etcdct1
+```bash
+{
+  tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
+  sudo mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
+}
+```
+configurar etcd server
+```bash
+{
+  sudo mkdir -p /etc/etcd /var/lib/etcd
+  sudo chmod 700 /var/lib/etcd
+  sudo cp ca.pem kubernetes-key.pem kubernetes.pem /etc/etcd/
+}
+```
+```bash
+INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
+  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+```
+```bash
+ETCD_NAME=$(hostname -s)
+```
+crear el servicio para etcd
+```bash
+cat <<EOF | sudo tee /etc/systemd/system/etcd.service
+[Unit]
+Description=etcd
+Documentation=https://github.com/coreos
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd \\
+  --name ${ETCD_NAME} \\
+  --cert-file=/etc/etcd/kubernetes.pem \\
+  --key-file=/etc/etcd/kubernetes-key.pem \\
+  --peer-cert-file=/etc/etcd/kubernetes.pem \\
+  --peer-key-file=/etc/etcd/kubernetes-key.pem \\
+  --trusted-ca-file=/etc/etcd/ca.pem \\
+  --peer-trusted-ca-file=/etc/etcd/ca.pem \\
+  --peer-client-cert-auth \\
+  --client-cert-auth \\
+  --initial-advertise-peer-urls https://${INTERNAL_IP}:2380 \\
+  --listen-peer-urls https://${INTERNAL_IP}:2380 \\
+  --listen-client-urls https://${INTERNAL_IP}:2379,https://127.0.0.1:2379 \\
+  --advertise-client-urls https://${INTERNAL_IP}:2379 \\
+  --initial-cluster-token etcd-cluster-0 \\
+  --initial-cluster controller-0=https://10.240.0.10:2380,controller-1=https://10.240.0.11:2380,controller-2=https://10.240.0.12:2380 \\
+  --initial-cluster-state new \\
+  --data-dir=/var/lib/etcd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+iniciar el servico etcd
+```bash
+{
+  sudo systemctl daemon-reload
+  sudo systemctl enable etcd
+  sudo systemctl start etcd
+}
+```
+verificación
+```bash
+sudo ETCDCTL_API=3 etcdctl member list \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/etcd/ca.pem \
+  --cert=/etc/etcd/kubernetes.pem \
+  --key=/etc/etcd/kubernetes-key.pem
+```
+
